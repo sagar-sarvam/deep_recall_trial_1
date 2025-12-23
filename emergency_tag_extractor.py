@@ -6,7 +6,7 @@ import instructor
 import re
 import os
 
-client = instructor.from_groq(Groq(api_key="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"), mode=instructor.Mode.JSON)
+client = instructor.from_groq(Groq(api_key=""), mode=instructor.Mode.JSON)
 
 class MetadataResponse(BaseModel):
     scopeAndContent: Optional[str] = Field(None, description="Scope and content of the document.")
@@ -85,4 +85,5 @@ if __name__ == "__main__":
     The manuscript titled 'Life in Ancient India' discusses cultural evolution between 1947 and 12-10-1569
     It mentions the Mauryan Empire, Ashoka, and scientific developments in metallurgy and astronomy.
     """
+
     print(type(extract_metadata(text)))
