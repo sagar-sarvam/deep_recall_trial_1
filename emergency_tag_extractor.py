@@ -27,31 +27,96 @@ class MetadataResponse(BaseModel):
 
 def extract_metadata(text: str):
     messages = [
+    {
+        "role": "system",
+        "content": f"""
+        You are a professional archival metadata extraction model.
+        
+        Your task is to analyze the given text and extract structured archival metadata.
+        You MUST return a single valid JSON object that strictly follows the schema below.
+        Do NOT include explanations, comments, markdown, or extra text outside JSON.
+        
+        FIELD DEFINITIONS AND GUIDELINES:
+        
+        - scopeAndContent:
+          A clear, well-written summary of the document.
+          It should explain what the document is about, its purpose, and its main themes.
+          Write this as a concise paragraph, not bullet points.
+          This field should read like an archival abstract.
+        
+        - generalNote:
+          Any additional contextual information that does not fit elsewhere.
+          Examples include condition of the document, unusual characteristics, or clarifying remarks.
+        
+        - genreAccessPoints:
+          The type or form of the document.
+          Examples: "report", "correspondence", "research paper", "policy document", "technical manual".
+        
+        - culture:
+          Cultural, historical, or social context represented in the document, if identifiable.
+          If not explicitly present, infer cautiously or leave empty.
+        
+        - scientificTerms:
+          Domain-specific technical or scientific terms explicitly mentioned in the text.
+          Do not invent terms.
+        
+        - entities:
+          persons_name, Important organizations, institutions, movements.
+        
+        - title:
+          The formal or inferred title of the document.
+          If no title is present, generate a concise descriptive title based on the content.
+        
+        - language:
+          languages used in the document.
+        
+        - topics:
+          High-level subject themes covered by the document.
+          These should be broader than scientificTerms.
+        
+        - geographic_locations:
+          Countries, regions, cities, or specific locations referenced in the text.
+        
+        - dates_mentioned:
+          All explicit dates found in the text.
+          Use ISO formats only: YYYY, YYYY-MM, or YYYY-MM-DD.
+        
+        - names_mentioned:
+          Names of people explicitly mentioned in the document.
+        
+        - places_mentioned:
+          Physical places, facilities, landmarks, or sites referenced.
+        
+        STRICT OUTPUT SCHEMA (JSON ONLY):
+        
         {
-            "role": "system",
-            "content": f"""
-            You are a metadata extraction model. 
-            Extract key fields from the given text and respond in structured JSON strictly following this schema:
-            {{
-              "scopeAndContent": "...",
-              "generalNote": "...",
-              "genreAccessPoints": ["..."],
-              "culture": "...",
-              "scientificTerms": ["..."],
-              "entities": ["..."],
-              "title": "...",
-              "language": "...",
-              "topics": ["..."],
-              "geographic_locations": ["..."],
-              "dates_mentioned": ["YYYY", "YYYY-MM", "YYYY-MM-DD"],
-              "names_mentioned": ["..."],
-              "places_mentioned": ["..."]
-            }}
-
-            Text: {text}
-            """
+          "scopeAndContent": "...",
+          "generalNote": "...",
+          "genreAccessPoints": ["..."],
+          "culture": "...",
+          "scientificTerms": ["..."],
+          "entities": ["..."],
+          "title": "...",
+          "language": "...",
+          "topics": ["..."],
+          "geographic_locations": ["..."],
+          "dates_mentioned": ["YYYY", "YYYY-MM", "YYYY-MM-DD"],
+          "names_mentioned": ["..."],
+          "places_mentioned": ["..."]
         }
-    ]
+        
+        IMPORTANT RULES:
+        - Do not hallucinate facts not present in the text.
+        - Use empty strings or empty arrays when information is unavailable.
+        - Ensure valid JSON formatting with double quotes only.
+        - Ensure scopeAndContent is a meaningful, human-readable summary.
+        
+        TEXT TO ANALYZE:
+        {text}
+        """
+            }
+        ]
+
 
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",

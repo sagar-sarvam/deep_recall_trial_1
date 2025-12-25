@@ -5,7 +5,7 @@ from sentence_transformers import SentenceTransformer
 # Connect to OpenSearch
 client = OpenSearch(
     hosts=[{'host': 'localhost', 'port': 9200}],
-    http_auth=('admin', 'Deeprecall@123'),
+    http_auth=("admin", "'Deeprecall@123'"),
     use_ssl=True,
     verify_certs=False
 )

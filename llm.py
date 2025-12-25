@@ -53,4 +53,3 @@ if __name__ == "__main__":
 
         answer = chat_with_llm(user_query, retrieval_content)
         print(f"\nAnswer: {answer}\n{'-'*60}\n")
-

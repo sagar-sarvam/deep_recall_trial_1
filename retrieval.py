@@ -35,7 +35,7 @@ def extract_from_query(input_query: str) -> dict :
 
             Rules:
             - Only include fields that appear explicitly or are clearly implied.
-            -always have field "scopeAndContent" with the scope of the querry
+            -always have field "scopeAndContent" with the summary of the querry by enhancing it
             - Omit missing or irrelevant fields entirely (even if it is an empty list).
             - Omit **empty lists** fields.
             - Use concise and factual extractions.

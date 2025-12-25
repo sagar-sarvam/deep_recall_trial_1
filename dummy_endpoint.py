@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File,Form
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -11,6 +11,8 @@ from pydantic import BaseModel
 import uvicorn
 import json
 from final_functions import process_and_index_document
+from vectordb_functions import clear_vector_index
+from fuzzy_metadata_search import existing_doc_ids, view_all_entries, view_doc_by_id, empty_index,delete_document_by_doc_id
 from llm import chat_with_llm
 
 app = FastAPI(title="Text & File Processing API", version="1.0.0")
@@ -33,6 +35,100 @@ class FileProcessRequest(BaseModel):
     doc_id: str
 
 
+@app.get("/entries")
+async def get_all_entries():
+    try:
+        docs = view_all_entries()
+        return {
+            "success": True,
+            "count": len(docs),
+            "data": docs
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "FETCH_ALL_FAILED",
+            "message": str(e)
+        }
+
+@app.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str):
+    try:
+        result = delete_document_by_doc_id(doc_id)
+        return result
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "DELETE_FAILED",
+            "message": str(e),
+            "doc_id": doc_id
+        }
+
+
+@app.get("/entries/{doc_id}")
+async def get_entry_by_doc_id(doc_id: str):
+    try:
+        doc = view_doc_by_id(doc_id)
+
+        if not doc:
+            return {
+                "success": False,
+                "error": "NOT_FOUND",
+                "message": f"Document with doc_id '{doc_id}' not found"
+            }
+
+        return {
+            "success": True,
+            "doc_id": doc_id,
+            "data": doc
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "FETCH_FAILED",
+            "message": str(e),
+            "doc_id": doc_id
+        }
+
+
+@app.delete("/indexes/clean")
+async def clean_indexes():
+    result = {
+        "success": True,
+        "vector_index": None,
+        "metadata_index": None
+    }
+
+    try:
+        clear_vector_index("deeprecall-rc-vector")
+        result["vector_index"] = {
+            "action": "deleted",
+            "index": "deeprecall-rc-vector"
+        }
+    except Exception as e:
+        result["success"] = False
+        result["vector_index"] = {
+            "action": "failed",
+            "error": str(e)
+        }
+
+    try:
+        meta_res = empty_index("deeprecall-rc-fuzzy")
+        result["metadata_index"] = meta_res
+        if not meta_res.get("success", False):
+            result["success"] = False
+    except Exception as e:
+        result["success"] = False
+        result["metadata_index"] = {
+            "action": "failed",
+            "error": str(e)
+        }
+
+    return result
+
+
 @app.post("/process-text", response_model=TextOutput)
 async def process_text(input_data: TextInput):
     user_query = input_data.text
@@ -42,47 +138,63 @@ async def process_text(input_data: TextInput):
 
 
 @app.post("/process-file")
-async def process_file(file: UploadFile = File(...), doc_id: Optional[str] = None):
+async def process_file(
+    file: UploadFile = File(...),
+    doc_id: Optional[str] = Form(None)
+):
+    print("doc_id =", doc_id)
+    duplicates = existing_doc_ids("deeprecall-rc-fuzzy", [doc_id])
+    if duplicates:
+        return {
+            "success": False,
+            "error": "DUPLICATE_DOC_ID",
+            "message": f"doc_id '{doc_id}' already exists"
+        }
+    file_path = None
+
     try:
-        # Save file in current directory with a safe filename
         filename = file.filename or "uploaded_file"
         safe_filename = f"temp_{doc_id}_{filename}" if doc_id else f"temp_{filename}"
         file_path = os.path.join(os.getcwd(), safe_filename)
-        
-        # Save the file
+
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
-        print(f"File saved to {file_path}")
-        
-        # Process using relative path
-        relative_path = os.path.basename(file_path)
-        metadata = process_and_index_document(relative_path, doc_id)
-     
-        
-        # Replace commas with spaces in list values
+
+        result = process_and_index_document(os.path.basename(file_path), doc_id)
+
+        if not result.get("success"):
+            return result
+
         processed_metadata = {}
-        for key, value in metadata.items():
+        for key, value in result["metadata"].items():
             if isinstance(value, list):
-                processed_metadata[key] = ' '.join(map(str, value))
+                processed_metadata[key] = " ".join(map(str, value))
             else:
                 processed_metadata[key] = value
+
         csv_content = json_to_csv(processed_metadata)
 
         return {
             "success": True,
+            "doc_id": doc_id,
             "csv": csv_content
         }
+
     except Exception as e:
-        return {"error": str(e)}
+        return {
+            "success": False,
+            "error": "UPLOAD_FAILED",
+            "message": str(e),
+            "doc_id": doc_id
+        }
+
     finally:
-        # Clean up the temporary file
-        if os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             try:
                 os.remove(file_path)
             except Exception:
                 pass
-
 
 @app.get("/health")
 async def health_check():
@@ -124,4 +236,4 @@ def json_to_csv(json_data: Dict[str, Any]) -> str:
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

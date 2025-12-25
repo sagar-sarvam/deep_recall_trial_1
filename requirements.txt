@@ -11,3 +11,4 @@ faiss-cpu
 sentence-transformers
 langchain
 openai
+python-multipart
